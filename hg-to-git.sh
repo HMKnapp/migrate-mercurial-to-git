@@ -4,7 +4,15 @@
 # - github.com/HMKnapp
 
 function _usage {
-  _echo_err "usage: ${SCRIPT_NAME} https://internal.sys/scm-webapp/hg/repo_name https://gitlab.com/user/group/repo_name"
+  _echo_err "Migrate Mercurial to Git"
+  _echo_err "https://github.com/HMKnapp/migrate-mercurial-to-git\n"
+  _echo_err "Usage:"
+  _echo_err "./${SCRIPT_NAME} <hg-repo-url> <git-repo-url>"
+  _echo_err "\nor\n"
+  _echo_err "export GIT_PREFIX=\"https://gitlab.com/user/group/\""
+  _echo_err "./${SCRIPT_NAME} <hg-repo-url>"
+  _echo_err "\n"
+  exit 1
 }
 
 function _echo_err {
@@ -36,7 +44,6 @@ function _get_fast_export_script {
 }
 
 function _create_temp_folders {
-  REPO_NAME=$(basename ${HG_REPO_URL})
   _TMP_DIR=$(mktemp -d)
   HG_FOLDER="${_TMP_DIR}/hg/${REPO_NAME}"
   GIT_FOLDER="${_TMP_DIR}/git/${REPO_NAME}"
@@ -59,17 +66,20 @@ function _clone_git_repo {
   git config core.ignoreCase false
 }
 
+function _create_git_repo {
+  _echo_err "Creating Git repo in ${GIT_FOLDER}..."
+  cd "${GIT_FOLDER}" || _abort "switch to GIT_FOLDER failed"
+  git init
+  git config core.ignoreCase false
+  git remote add origin "${GIT_REPO_URL}"
+}
+
 function _fast_export {
   _echo_err "Launching fast-export inside GIT_FOLDER: ${FE_SH} -r ${HG_FOLDER}"
   cd "${GIT_FOLDER}"
   bash ${FE_SH} -r ${HG_FOLDER} || _abort "fast-export failed. Do manually:\n GIT_FOLDER: ${GIT_FOLDER}\nHG_FOLDER: ${HG_FOLDER}\n${FE_SH}"
   git checkout HEAD
   rm -f .hgignore
-}
-
-function _add_git_remote {
-  cd "${GIT_FOLDER}"
-  git remote add origin "${GIT_REPO_URL}"
 }
 
 function _push_to_git {
@@ -87,18 +97,24 @@ function _retry_push_to_git {
 }
 
 SCRIPT_NAME=$(basename "${0}")
-[[ -n ${2} ]] || _usage
+[[ -z ${2} && -z ${GIT_PREFIX} ]] && _usage
+[[ -z ${1} ]] && _usage
 
 HG_REPO_URL="${1}"
-GIT_REPO_URL="${2}"
+REPO_NAME=$(basename ${HG_REPO_URL})
+[[ -n ${GIT_PREFIX} ]] && GIT_REPO_URL="${GIT_PREFIX}${REPO_NAME}"
+[[ -n ${2} ]] && GIT_REPO_URL="${2}"
 
 #_check_auth_vars
 _get_fast_export_script
 _create_temp_folders
 _clone_hg_repo
-_clone_git_repo
+_create_git_repo
 _fast_export
 ## _add_git_remote # sollte nicht gebraucht werden
 _push_to_git
+
+_echo_err "\n\n"
+echo "${GIT_REPO_URL}"
 
 exit 0
