@@ -20,4 +20,9 @@ The target repo will be `https://gitlab.com/user/group/`**`some_name`**
 
 ---
 
+## Acknowledgements:
+* Uses https://github.com/frej/fast-export for the repo conversion
+
+---
+
 *PULL REQUESTS WELCOME*
