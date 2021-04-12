@@ -3,6 +3,9 @@
 # Migrate Mercurial to Git
 # - github.com/HMKnapp
 
+export LC_ALL=C
+CURRENT_DIR="$(pwd)"
+
 function _usage {
   _echo_err "Migrate Mercurial to Git"
   _echo_err "https://github.com/HMKnapp/migrate-mercurial-to-git\n"
@@ -55,8 +58,7 @@ function _clone_hg_repo {
   _echo_err "Cloning ${HG_REPO_URL} to ${HG_FOLDER}..."
   HG_AUTH_PREFIX=$(cut -d/ -f1-3 <<< ${HG_REPO_URL})
   cd "${HG_FOLDER}" || _abort "switch to HG_FOLDER failed"
-  #hg clone -u --config auth.x.prefix="${HG_AUTH_PREFIX}/" --config auth.x.username="${HG_USER}" --config auth.x.password="${HG_PASS}" "${HG_REPO_URL}" || _abort "Cloning hg repo failed"
-  hg --config ui.interactive=yes clone "${HG_REPO_URL}" . || _abort "Cloning hg repo failed"
+  hg --config auth.rc.prefix="${HG_AUTH_PREFIX}/" --config auth.rc.username="${HG_USER}" --config auth.rc.password="${HG_PASS}" clone --insecure "${HG_REPO_URL}" ${HG_FOLDER} || _abort "Cloning hg repo failed"
 }
 
 function _clone_git_repo {
@@ -78,8 +80,9 @@ function _fast_export {
   _echo_err "Launching fast-export inside GIT_FOLDER: ${FE_SH} -r ${HG_FOLDER}"
   cd "${GIT_FOLDER}"
   bash ${FE_SH} -r ${HG_FOLDER} || _abort "fast-export failed. Do manually:\n GIT_FOLDER: ${GIT_FOLDER}\nHG_FOLDER: ${HG_FOLDER}\n${FE_SH}"
-  git checkout HEAD
-  rm -f .hgignore
+  if [[ -n $(ls) ]]; then
+    git checkout HEAD || _abort "Conversion to Git failed. Do manually:\n GIT_FOLDER: ${GIT_FOLDER}\nHG_FOLDER: ${HG_FOLDER}\n${FE_SH}"
+  fi
 }
 
 function _push_to_git {
@@ -105,14 +108,15 @@ REPO_NAME=$(basename ${HG_REPO_URL})
 [[ -n ${GIT_PREFIX} ]] && GIT_REPO_URL="${GIT_PREFIX}${REPO_NAME}"
 [[ -n ${2} ]] && GIT_REPO_URL="${2}"
 
-#_check_auth_vars
+_check_auth_vars
 _get_fast_export_script
 _create_temp_folders
 _clone_hg_repo
 _create_git_repo
 _fast_export
-## _add_git_remote # sollte nicht gebraucht werden
 _push_to_git
+cd "${CURRENT_DIR}"
+mv "${GIT_FOLDER}" .
 
 _echo_err "\n\n"
 echo "${GIT_REPO_URL}"
